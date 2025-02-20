@@ -1,201 +1,301 @@
+// Get canvas and context
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-// Astronaut image setup
-const astronautImg = new Image();
-astronautImg.src = 'astronaut.png'; // Your 32x32 sprite file
+// Load images
+const astronautOnImg = new Image();
+astronautOnImg.src = 'astronaut-on.png';
+const astronautOffImg = new Image();
+astronautOffImg.src = 'astronaut-off.png';
+const meteorGreenImg = new Image();
+meteorGreenImg.src = 'meteor-green.png';
+const meteorRedImg = new Image();
+meteorRedImg.src = 'meteor-red.png';
 
-// Astronaut (player) properties
+// Astronaut properties
 const astronaut = {
-    x: canvas.width / 2 - 16, // Start in the middle
-    y: canvas.height / 2 - 16, // Start in the middle vertically
-    width: 32,
-    height: 64,
-    speedX: 0, // Initial horizontal velocity
-    speedY: 0, // Initial vertical velocity
-    maxSpeed: 3.5, // Reduced by 50% from 7 (slower maximum speed)
-    acceleration: 0.25, // Reduced by 50% from 0.5 (slower jetpack thrust)
-    friction: 0.02 // Friction remains the same for consistent deceleration
+    x: canvas.width / 2 - 25,
+    y: canvas.height / 2 - 43.5,
+    width: 50,
+    height: 87,
+    speedX: 0,
+    speedY: 0,
+    maxSpeed: 10,
+    acceleration: 0.25,
+    friction: 0.02,
+    collisionWidth: 30,
+    collisionHeight: 60,
+    collisionOffsetX: 12,
+    collisionOffsetY: 6
 };
 
 // Meteor properties
 const meteors = [];
-const meteorSpeed = 5;
-const spawnRate = 25; // Keep faster spawn rate for difficulty
+const meteorSpeed = 3;
+const baseSpawnRate = 50;
+let spawnRate = baseSpawnRate;
 
-// Keyboard controls
-const keys = { up: false, down: false, left: false, right: false };
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp') keys.up = true;
-    if (e.key === 'ArrowDown') keys.down = true;
-    if (e.key === 'ArrowLeft') keys.left = true;
-    if (e.key === 'ArrowRight') keys.right = true;
-});
-document.addEventListener('keyup', (e) => {
-    if (e.key === 'ArrowUp') keys.up = false;
-    if (e.key === 'ArrowDown') keys.down = false;
-    if (e.key === 'ArrowLeft') keys.left = false;
-    if (e.key === 'ArrowRight') keys.right = false;
-});
+// Star properties
+const stars = [];
+const numStars = 100;
+function createStar() {
+    return {
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        width: Math.random() * 2 + 1,
+        height: Math.random() * 2 + 1,
+        speed: Math.random() * 2 + 1,
+        color: Math.random() > 0.5 ? '#FFFFFF' : '#CCCCCC'
+    };
+}
 
 // Game state
-let gameState = 'start'; // 'start', 'playing', or 'gameOver'
-let gameOver = false;
+let gameState = 'start';
 let frameCount = 0;
-let score = 0; // Score based on meteors dodged
+let score = 0;
+let highScore = localStorage.getItem('highScore') ? parseInt(localStorage.getItem('highScore')) : 0;
+let animationFrameId = null;
 
-// Buttons
-const startButton = document.getElementById('startButton');
+// UI elements
 const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const startButton = document.getElementById('startButton');
+const replayButton = document.getElementById('replayButton');
+const scoreDisplay = document.getElementById('scoreDisplay');
+const finalScore = document.getElementById('finalScore');
+const finalHighScore = document.getElementById('finalHighScore');
 
-// Function to spawn a meteor
+// Debug flag
+const SHOW_HITBOXES = false; // Set to true to show hitboxes, false to hide
+
+// Input handling
+const keys = { up: false, down: false, left: false, right: false };
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w') keys.up = true;
+    if (e.key === 'ArrowDown' || e.key === 's') keys.down = true;
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+});
+document.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w') keys.up = false;
+    if (e.key === 'ArrowDown' || e.key === 's') keys.down = false;
+    if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+    if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+});
+
+// Spawn meteor
 function spawnMeteor() {
-    const size = 20 + Math.random() * 20; // Random size between 20 and 40
-    const x = Math.random() * (canvas.width - size); // Random x position
+    const size = 20 + Math.random() * 100;
+    const x = Math.random() * (canvas.width - size);
     meteors.push({
-        x: x,
-        y: -size, // Start above screen
+        x,
+        y: -size,
         width: size,
         height: size,
-        speed: meteorSpeed + Math.random() * 2.5 // Slightly variable speed
+        speed: meteorSpeed + Math.random() * 2,
+        isRed: size >= 100,
+        collisionWidth: size * 0.75,
+        collisionHeight: size * 0.75,
+        collisionOffsetX: size * 0.1,
+        collisionOffsetY: size * 0.1
     });
 }
 
-// Function to reset the game (now triggered by refreshing or starting over)
+// Reset game
 function resetGame() {
-    astronaut.x = canvas.width / 2 - 16;
-    astronaut.y = canvas.height / 2 - 16;
-    astronaut.speedX = 0; // Reset velocities
+    astronaut.x = canvas.width / 2 - 25;
+    astronaut.y = canvas.height / 2 - 43.5;
+    astronaut.speedX = 0;
     astronaut.speedY = 0;
-    meteors.length = 0; // Clear all meteors
-    gameOver = false;
+    meteors.length = 0;
+    stars.length = 0;
+    for (let i = 0; i < numStars; i++) {
+        stars.push(createStar());
+    }
     score = 0;
     frameCount = 0;
+    spawnRate = baseSpawnRate;
     gameState = 'playing';
-    startScreen.style.display = 'none'; // Ensure start screen stays hidden
+    startScreen.style.display = 'none';
+    gameOverScreen.classList.add('hidden');
+    updateScoreDisplay();
 }
 
-// Update astronaut position with physics
-function updateAstronaut() {
-    // Apply jetpack thrust (acceleration) when keys are pressed
-    if (keys.up && astronaut.speedY > -astronaut.maxSpeed) {
-        astronaut.speedY -= astronaut.acceleration; // Thrust upward
-    }
-    if (keys.down && astronaut.speedY < astronaut.maxSpeed) {
-        astronaut.speedY += astronaut.acceleration; // Thrust downward
-    }
-    if (keys.left && astronaut.speedX > -astronaut.maxSpeed) {
-        astronaut.speedX -= astronaut.acceleration; // Thrust left
-    }
-    if (keys.right && astronaut.speedX < astronaut.maxSpeed) {
-        astronaut.speedX += astronaut.acceleration; // Thrust right
-    }
+// Update astronaut
+function updateAstronaut(deltaTime) {
+    const accel = astronaut.acceleration * deltaTime;
+    if (keys.up && astronaut.speedY > -astronaut.maxSpeed) astronaut.speedY -= accel;
+    if (keys.down && astronaut.speedY < astronaut.maxSpeed) astronaut.speedY += accel;
+    if (keys.left && astronaut.speedX > -astronaut.maxSpeed) astronaut.speedX -= accel;
+    if (keys.right && astronaut.speedX < astronaut.maxSpeed) astronaut.speedX += accel;
 
-    // Apply friction to slow down when no keys are pressed
-    if (!keys.up && !keys.down) {
-        astronaut.speedY *= (1 - astronaut.friction); // Decelerate vertically
-        if (Math.abs(astronaut.speedY) < 0.1) astronaut.speedY = 0; // Stop if very slow
-    }
-    if (!keys.left && !keys.right) {
-        astronaut.speedX *= (1 - astronaut.friction); // Decelerate horizontally
-        if (Math.abs(astronaut.speedX) < 0.1) astronaut.speedX = 0; // Stop if very slow
-    }
+    const friction = 1 - (astronaut.friction * deltaTime);
+    astronaut.speedX *= friction;
+    astronaut.speedY *= friction;
+    if (Math.abs(astronaut.speedX) < 0.1) astronaut.speedX = 0;
+    if (Math.abs(astronaut.speedY) < 0.1) astronaut.speedY = 0;
 
-    // Update position based on velocity
-    astronaut.x += astronaut.speedX;
-    astronaut.y += astronaut.speedY;
+    astronaut.x += astronaut.speedX * deltaTime;
+    astronaut.y += astronaut.speedY * deltaTime;
 
-    // Boundary checks (prevent leaving canvas)
-    if (astronaut.x < 0) {
-        astronaut.x = 0;
-        astronaut.speedX = 0; // Stop at left edge
+    astronaut.x = Math.max(0, Math.min(canvas.width - astronaut.width, astronaut.x));
+    astronaut.y = Math.max(0, Math.min(canvas.height - astronaut.height, astronaut.y));
+
+    if (astronaut.x === 0 || astronaut.x === canvas.width - astronaut.width) astronaut.speedX = 0;
+    if (astronaut.y === 0 || astronaut.y === canvas.height - astronaut.height) astronaut.speedY = 0;
+}
+
+// Check collision
+function checkCollision(astronaut, meteor) {
+    const astroLeft = astronaut.x + astronaut.collisionOffsetX;
+    const astroRight = astroLeft + astronaut.collisionWidth;
+    const astroTop = astronaut.y + astronaut.collisionOffsetY;
+    const astroBottom = astroTop + astronaut.collisionHeight;
+
+    const meteorLeft = meteor.x + meteor.collisionOffsetX;
+    const meteorRight = meteorLeft + meteor.collisionWidth;
+    const meteorTop = meteor.y + meteor.collisionOffsetY;
+    const meteorBottom = meteorTop + meteor.collisionHeight;
+
+    return (
+        astroLeft < meteorRight &&
+        astroRight > meteorLeft &&
+        astroTop < meteorBottom &&
+        astroBottom > meteorTop
+    );
+}
+
+// Update and draw stars
+function updateStars(deltaTime) {
+    for (let i = 0; i < stars.length; i++) {
+        const star = stars[i];
+        star.y += star.speed * deltaTime;
+
+        if (star.y > canvas.height) {
+            star.y = -star.height;
+            star.x = Math.random() * canvas.width;
+        }
+
+        ctx.fillStyle = star.color;
+        ctx.fillRect(star.x, star.y, star.width, star.height);
     }
-    if (astronaut.x > canvas.width - astronaut.width) {
-        astronaut.x = canvas.width - astronaut.width;
-        astronaut.speedX = 0; // Stop at right edge
-    }
-    if (astronaut.y < 0) {
-        astronaut.y = 0;
-        astronaut.speedY = 0; // Stop at top edge
-    }
-    if (astronaut.y > canvas.height - astronaut.height) {
-        astronaut.y = canvas.height - astronaut.height;
-        astronaut.speedY = 0; // Stop at bottom edge
-    }
+}
+
+// Debug: Draw hitbox
+function drawHitbox(obj, color = 'red') {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(
+        obj.x + obj.collisionOffsetX,
+        obj.y + obj.collisionOffsetY,
+        obj.collisionWidth,
+        obj.collisionHeight
+    );
+}
+
+// Update score display
+function updateScoreDisplay() {
+    scoreDisplay.textContent = `Score: ${score} | High Score: ${highScore}`;
 }
 
 // Game loop
-function update() {
-    if (gameState === 'start') {
-        // Do nothing; start screen is shown
-        return;
-    }
+let lastTime = 0;
+function gameLogic(deltaTime) {
+    if (gameState !== 'playing') return;
 
-    if (gameState === 'gameOver') {
-        ctx.fillStyle = 'white'; // White for visibility against dark background
-        ctx.font = '30px Arial';
-        ctx.fillText('Game Over', canvas.width / 2 - 80, canvas.height / 2);
-        ctx.fillText(`Score: ${score}`, canvas.width / 2 - 60, canvas.height / 2 + 40); // Show final score
-        return; // No button, player must refresh or click "Start" again
-    }
-
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Update astronaut with physics
-    updateAstronaut();
-
-    // Spawn meteors randomly
+    updateAstronaut(deltaTime);
     frameCount++;
-    if (frameCount % spawnRate === 0) {
-        spawnMeteor();
-    }
+    if (frameCount % Math.floor(spawnRate) === 0) spawnMeteor();
 
-    // Update and draw meteors
-    ctx.fillStyle = '#808080'; // Gray for meteors
+    spawnRate = Math.max(10, baseSpawnRate - Math.floor(score / 200));
+
     for (let i = meteors.length - 1; i >= 0; i--) {
         const meteor = meteors[i];
-        meteor.y += meteor.speed;
+        meteor.y += meteor.speed * deltaTime;
 
-        // Draw meteor
-        ctx.fillRect(meteor.x, meteor.y, meteor.width, meteor.height);
-
-        // Check collision with astronaut
-        if (
-            astronaut.x < meteor.x + meteor.width &&
-            astronaut.x + astronaut.width > meteor.x &&
-            astronaut.y < meteor.y + meteor.height &&
-            astronaut.y + astronaut.height > meteor.y
-        ) {
-            gameOver = true;
+        if (checkCollision(astronaut, meteor)) {
             gameState = 'gameOver';
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+            }
+            updateScoreDisplay();
+            finalScore.textContent = score;
+            finalHighScore.textContent = highScore;
+            gameOverScreen.classList.remove('hidden');
         }
 
-        // Score points and remove meteor if off-screen
         if (meteor.y > canvas.height) {
             meteors.splice(i, 1);
-            score += 10; // 10 points per meteor dodged
+            score += 10;
+            updateScoreDisplay();
         }
     }
-
-    // Draw astronaut
-    ctx.drawImage(astronautImg, astronaut.x, astronaut.y, astronaut.width, astronaut.height);
-
-    // Draw score
-    ctx.fillStyle = 'white';
-    ctx.font = '20px Arial';
-    ctx.fillText(`Score: ${score}`, 10, 30); // Top-left corner
-
-    // Request next frame
-    requestAnimationFrame(update);
 }
 
-// Add start button click handler
+function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    updateStars(1);
+
+    for (const meteor of meteors) {
+        const img = meteor.isRed ? meteorRedImg : meteorGreenImg;
+        ctx.drawImage(img, meteor.x, meteor.y, meteor.width, meteor.height);
+        if (SHOW_HITBOXES) drawHitbox(meteor, 'red');
+    }
+
+    ctx.save();
+    ctx.translate(astronaut.x + astronaut.width / 2, astronaut.y + astronaut.height / 2);
+    ctx.rotate((astronaut.speedX * Math.PI) / 180);
+    const currentAstronautImg = (keys.up || keys.down || keys.left || keys.right) ? astronautOnImg : astronautOffImg;
+    ctx.drawImage(currentAstronautImg, -astronaut.width / 2, -astronaut.height / 2, astronaut.width, astronaut.height);
+    ctx.restore();
+    if (SHOW_HITBOXES) drawHitbox(astronaut, 'blue');
+}
+
+function update(timestamp) {
+    const deltaTime = (timestamp - lastTime) / 16.67;
+    lastTime = timestamp;
+
+    if (gameState === 'playing') {
+        gameLogic(deltaTime);
+    }
+    render();
+
+    animationFrameId = requestAnimationFrame(update);
+}
+
+// Start and replay handlers
 startButton.addEventListener('click', () => {
-    gameState = 'playing';
-    startScreen.style.display = 'none'; // Hide start screen
-    resetGame(); // Reset game state and start playing
-    update(); // Start the game loop
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    resetGame();
+    requestAnimationFrame((timestamp) => {
+        lastTime = timestamp;
+        update(timestamp);
+    });
 });
 
-// Start with the start screen visible (no initial update call)
+replayButton.addEventListener('click', () => {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    resetGame();
+    requestAnimationFrame((timestamp) => {
+        lastTime = timestamp;
+        update(timestamp);
+    });
+});
+
+// Image loading
+let imagesLoaded = 0;
+const totalImages = 4;
+function checkImagesLoaded() {
+    if (imagesLoaded === totalImages) {
+        startButton.disabled = false;
+        for (let i = 0; i < numStars; i++) {
+            stars.push(createStar());
+        }
+    }
+}
+
+astronautOnImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
+astronautOffImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
+meteorGreenImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
+meteorRedImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
