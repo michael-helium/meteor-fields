@@ -299,3 +299,5 @@ astronautOnImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
 astronautOffImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
 meteorGreenImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
 meteorRedImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
+// After all other code
+updateScoreDisplay();
