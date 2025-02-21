@@ -11,7 +11,7 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: #120826; /* Dark purple background */
+            background-color: #120826;
             overflow: hidden;
             font-family: 'Arial', 'Helvetica', sans-serif;
         }
@@ -35,7 +35,7 @@
             font-size: 20px;
             color: #FFFFFF;
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-            margin: 10px 0; /* Space above canvas */
+            margin: 10px 0;
             text-align: center;
             z-index: 10;
         }
@@ -51,16 +51,16 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            width: 755px; /* 80% of 804px (canvas width + border) */
-            height: 538px; /* 80% of 604px (canvas height + border) */
-            background-color: rgba(18, 8, 38, 0.7); /* Semi-transparent purple */
+            width: 755px;
+            height: 538px;
+            background-color: rgba(18, 8, 38, 0.7);
             color: #FFFFFF;
             text-align: center;
             z-index: 20;
             transition: opacity 0.5s ease-in-out;
-            top: 200px; /* Centered vertically on canvas */
-            left: 50%; /* Center horizontally */
-            transform: translateX(-50%); /* Shift left by half width for centering */
+            top: 200px;
+            left: 50%;
+            transform: translateX(-50%);
         }
         #startScreen.hidden, #gameOverScreen.hidden {
             display: none;
@@ -126,6 +126,7 @@
             <img id="astronautPreview" src="astronaut-on.png" alt="Astronaut">
             <p>Use arrow keys (up, down, left, right) to dodge meteors.</p>
             <p>Survive to score points! Avoid meteors to earn 10 points each.</p>
+            <p>Collect <img src="helium-atom.png" alt="Helium Atom" style="width: 25px; vertical-align: middle;"> to score bonus points!</p>
             <button id="startButton" disabled>Start</button>
         </div>
         <div id="gameOverScreen" class="hidden">
