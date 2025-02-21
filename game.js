@@ -11,6 +11,9 @@ const meteorGreenImg = new Image();
 meteorGreenImg.src = 'meteor-green.png';
 const meteorRedImg = new Image();
 meteorRedImg.src = 'meteor-red.png';
+// NEW: Helium atom image
+const heliumImg = new Image();
+heliumImg.src = 'helium-atom.png';
 
 // Astronaut properties
 const astronaut = {
@@ -32,8 +35,12 @@ const astronaut = {
 // Meteor properties
 const meteors = [];
 const meteorSpeed = 3;
-const baseSpawnRate = 50;
+const baseSpawnRate = 100;
 let spawnRate = baseSpawnRate;
+
+// NEW: Helium atom properties
+const heliumAtoms = [];
+const heliumSpawnRate = 500;
 
 // Star properties
 const stars = [];
@@ -66,7 +73,7 @@ const finalScore = document.getElementById('finalScore');
 const finalHighScore = document.getElementById('finalHighScore');
 
 // Debug flag
-const SHOW_HITBOXES = false; // Set to true to show hitboxes, false to hide
+const SHOW_HITBOXES = false;
 
 // Input handling
 const keys = { up: false, down: false, left: false, right: false };
@@ -101,6 +108,21 @@ function spawnMeteor() {
     });
 }
 
+// NEW: Spawn helium atom
+function spawnHeliumAtom() {
+    heliumAtoms.push({
+        x: Math.random() * (canvas.width - 25),
+        y: -25,
+        width: 25,
+        height: 25,
+        speed: 2,
+        collisionWidth: 20,
+        collisionHeight: 20,
+        collisionOffsetX: 2.5,
+        collisionOffsetY: 2.5
+    });
+}
+
 // Reset game
 function resetGame() {
     astronaut.x = canvas.width / 2 - 25;
@@ -108,6 +130,8 @@ function resetGame() {
     astronaut.speedX = 0;
     astronaut.speedY = 0;
     meteors.length = 0;
+    // NEW: Reset helium atoms
+    heliumAtoms.length = 0;
     stars.length = 0;
     for (let i = 0; i < numStars; i++) {
         stars.push(createStar());
@@ -206,8 +230,10 @@ function gameLogic(deltaTime) {
     updateAstronaut(deltaTime);
     frameCount++;
     if (frameCount % Math.floor(spawnRate) === 0) spawnMeteor();
+    // NEW: Helium atom spawning
+    if (frameCount % heliumSpawnRate === 0) spawnHeliumAtom();
 
-    spawnRate = Math.max(10, baseSpawnRate - Math.floor(score / 200));
+    spawnRate = Math.max(10, baseSpawnRate - Math.floor(score / 250));
 
     for (let i = meteors.length - 1; i >= 0; i--) {
         const meteor = meteors[i];
@@ -231,6 +257,20 @@ function gameLogic(deltaTime) {
             updateScoreDisplay();
         }
     }
+
+    // NEW: Helium atom update and collision
+    for (let i = heliumAtoms.length - 1; i >= 0; i--) {
+        const helium = heliumAtoms[i];
+        helium.y += helium.speed * deltaTime;
+
+        if (checkCollision(astronaut, helium)) {
+            score += 1000;
+            heliumAtoms.splice(i, 1);
+            updateScoreDisplay();
+        } else if (helium.y > canvas.height) {
+            heliumAtoms.splice(i, 1);
+        }
+    }
 }
 
 function render() {
@@ -242,6 +282,16 @@ function render() {
         ctx.drawImage(img, meteor.x, meteor.y, meteor.width, meteor.height);
         if (SHOW_HITBOXES) drawHitbox(meteor, 'red');
     }
+
+    // In render(), replace simple helium draw with:
+for (const helium of heliumAtoms) {
+    // Glow effect
+    ctx.shadowBlur = 50 + Math.sin(frameCount * 0.1) * 25; // Pulsating 10-20px
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.7)'; // White glow
+    ctx.drawImage(heliumImg, helium.x, helium.y, helium.width, helium.height);
+    ctx.shadowBlur = 0; // Reset to avoid affecting other drawings
+    if (SHOW_HITBOXES) drawHitbox(helium, 'white');
+}
 
     ctx.save();
     ctx.translate(astronaut.x + astronaut.width / 2, astronaut.y + astronaut.height / 2);
@@ -285,7 +335,7 @@ replayButton.addEventListener('click', () => {
 
 // Image loading
 let imagesLoaded = 0;
-const totalImages = 4;
+const totalImages = 5; // CHANGED: from 4 to 5
 function checkImagesLoaded() {
     if (imagesLoaded === totalImages) {
         startButton.disabled = false;
@@ -299,5 +349,8 @@ astronautOnImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
 astronautOffImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
 meteorGreenImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
 meteorRedImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
-// After all other code
+// NEW: Helium image load handler
+heliumImg.onload = () => { imagesLoaded++; checkImagesLoaded(); };
+
+// NEW: Initial score display update (fixes previous high score issue)
 updateScoreDisplay();
