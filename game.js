@@ -1,10 +1,3 @@
-// At the top of game.js
-FBInstant.initializeAsync().then(() => {
-    FBInstant.startGameAsync().then(() => {
-        // Existing game code starts here
-    });
-});
-
 // In gameLogic(), where high score updates
 if (score > highScore) {
     highScore = score;
