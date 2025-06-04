@@ -1,12 +1,3 @@
-// In gameLogic(), where high score updates
-if (score > highScore) {
-    highScore = score;
-    localStorage.setItem('highScore', highScore);
-    FBInstant.getLeaderboardAsync('HighScores')
-        .then(leaderboard => leaderboard.setScoreAsync(highScore))
-        .catch(err => console.log('Leaderboard error:', err));
-}
-
 // Get canvas and context
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -229,8 +220,6 @@ function drawHitbox(obj, color = 'red') {
 // Update score display
 function updateScoreDisplay() {
     scoreDisplay.textContent = `Score: ${score} | High Score: ${highScore}`;
-
-    
 }
 
 // Game loop
